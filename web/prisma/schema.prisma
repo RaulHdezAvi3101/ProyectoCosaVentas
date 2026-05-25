@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ListingStatus {
+  draft
+  active
+  live
+  locked
+  sold
+}
+
+enum UserRole {
+  buyer
+  seller
+  admin
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  displayName   String
+  handle        String    @unique
+  avatarUrl     String?
+  role          UserRole  @default(buyer)
+  legacyGuestId String?   @unique
+  createdAt     DateTime  @default(now())
+  listings      Listing[]       @relation("SellerListings")
+  claimAttempts ClaimAttempt[]
+  reservations  Reservation[]   @relation("WinnerReservations")
+  sellerProfile SellerProfile?
+  sessions      Session[]
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+}
+
+model SellerProfile {
+  id              String @id @default(cuid())
+  userId          String @unique
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score           Int    @default(0)
+  tier            String @default("nuevo")
+  sales           Int    @default(0)
+  positiveRate    Float  @default(0)
+  onTimeShipping  Float  @default(0)
+  memberSince     String
+}
+
+model Listing {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  sellerId        String
+  seller          User          @relation("SellerListings", fields: [sellerId], references: [id])
+  title           String
+  description     String
+  priceCents      Int
+  currency        String        @default("MXN")
+  category        String
+  condition       String
+  imageUrls       String[]
+  status          ListingStatus @default(active)
+  firstToClaim    Boolean       @default(false)
+  claimPhraseHash String?
+  phraseHidden    Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  claimAttempts   ClaimAttempt[]
+  reservations    Reservation[]
+}
+
+model ClaimAttempt {
+  id            String   @id @default(cuid())
+  listingId     String
+  listing       Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  phrasePreview String
+  isWinner      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([listingId, createdAt])
+}
+
+model Reservation {
+  id                String    @id @default(cuid())
+  listingId         String    @unique
+  listing           Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  winnerId          String
+  winner            User      @relation("WinnerReservations", fields: [winnerId], references: [id])
+  lockedAt          DateTime  @default(now())
+  paymentDeadlineAt DateTime
+  releasedAt        DateTime?
+  bullJobId         String?
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  reservationId String    @unique
+  status        String    @default("pending")
+  createdAt     DateTime  @default(now())
+  paidAt        DateTime?
+}

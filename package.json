@@ -1,0 +1,16 @@
+{
+  "name": "proyecto-cosa-ventas",
+  "private": true,
+  "description": "Monorepo raíz — la app Next.js vive en web/",
+  "scripts": {
+    "dev": "npm run dev --prefix web",
+    "build": "npm run build --prefix web",
+    "start": "npm run start --prefix web",
+    "lint": "npm run lint --prefix web",
+    "install:web": "npm ci --prefix web",
+    "install:web:legacy": "npm install --prefix web",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:setup": "npm run db:up && npm run db:migrate --prefix web && npm run db:seed --prefix web"
+  }
+}

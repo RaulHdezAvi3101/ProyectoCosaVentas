@@ -1,0 +1,258 @@
+// mio — schema objetivo (7 modelos). Activar por fase en migraciones.
+// Referencia: docs/DATA-HANDOFF.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Fase 0 — tabla sentinel para migración inicial (sin lógica de negocio)
+model SchemaMeta {
+  id    Int @id @default(1)
+  phase Int @default(1)
+}
+
+// --- Fase 1: Auth y perfiles ---
+
+enum UserRole {
+  user
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  displayName   String
+  handle        String         @unique
+  avatarUrl     String         @default("")
+  role          UserRole       @default(user)
+  legacyGuestId String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sellerProfile SellerProfile?
+  sessions      Session[]
+  listings      Listing[]
+  claimAttempts ClaimAttempt[]
+  reservations  Reservation[]
+  bundles       Bundle[]
+  followers     SellerFollow[] @relation("SellerFollowers")
+  following     SellerFollow[] @relation("SellerFollowing")
+  wantListItems WantListItem[]
+  wantOffers    WantOffer[]    @relation("WantOfferSeller")
+  notifications InAppNotification[]
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model SellerProfile {
+  userId         String @id
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score          Int    @default(0)
+  tier           String @default("nuevo")
+  sales          Int    @default(0)
+  positiveRate   Int    @default(0)
+  onTimeShipping Int    @default(0)
+  avgShipHours   Int    @default(48)
+  responseRate   Int    @default(0)
+  memberSince    String
+}
+
+// --- Fase 2: Listings ---
+
+enum ListingStatus {
+  draft
+  active
+  live
+  locked
+  sold
+}
+
+model Listing {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  sellerId        String
+  seller          User          @relation(fields: [sellerId], references: [id])
+  title           String
+  description     String
+  priceCents      Int
+  currency        String        @default("MXN")
+  category        String
+  condition       String
+  imageUrls       String[]
+  status          ListingStatus @default(draft)
+  firstToClaim    Boolean       @default(false)
+  claimPhraseHash String?
+  phraseHidden    Boolean       @default(true)
+  quantity        Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  claimAttempts   ClaimAttempt[]
+  reservation     Reservation?
+  bundleItems     BundleItem[]
+  wantOffers      WantOffer[]
+}
+
+// --- Fase 7: Perfil vendedor, bundles, follow ---
+
+enum BundleStatus {
+  draft
+  active
+  sold
+  archived
+}
+
+model Bundle {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  sellerId    String
+  seller      User         @relation(fields: [sellerId], references: [id])
+  title       String
+  description String
+  priceCents  Int
+  currency    String       @default("MXN")
+  pickCount   Int?
+  status      BundleStatus @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  items       BundleItem[]
+}
+
+model BundleItem {
+  id        String  @id @default(cuid())
+  bundleId  String
+  bundle    Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  sortOrder Int     @default(0)
+
+  @@unique([bundleId, listingId])
+  @@index([listingId])
+}
+
+model SellerFollow {
+  followerId String
+  follower   User     @relation("SellerFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  sellerId   String
+  seller     User     @relation("SellerFollowers", fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([followerId, sellerId])
+  @@index([sellerId])
+}
+
+// --- Fase 8: Want list pública ---
+
+enum WantStatus {
+  active
+  fulfilled
+  closed
+}
+
+enum WantOfferStatus {
+  pending
+  accepted
+  rejected
+  withdrawn
+}
+
+model WantListItem {
+  id               String     @id @default(cuid())
+  slug             String     @unique
+  userId           String
+  user             User       @relation(fields: [userId], references: [id])
+  title            String
+  description      String
+  category         String
+  desiredCondition String
+  targetPriceCents Int
+  currency         String     @default("MXN")
+  status           WantStatus @default(active)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  offers           WantOffer[]
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+model WantOffer {
+  id          String          @id @default(cuid())
+  wantId      String
+  want        WantListItem    @relation(fields: [wantId], references: [id], onDelete: Cascade)
+  sellerId    String
+  seller      User            @relation("WantOfferSeller", fields: [sellerId], references: [id])
+  listingId   String?
+  listing     Listing?        @relation(fields: [listingId], references: [id])
+  priceCents  Int
+  message     String
+  status      WantOfferStatus @default(pending)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([wantId, sellerId])
+  @@index([wantId, createdAt])
+}
+
+model InAppNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String
+  href      String    @default("")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+// --- Fase 3: First-to-Claim, reservas, órdenes ---
+
+model ClaimAttempt {
+  id            String   @id @default(cuid())
+  listingId     String
+  listing       Listing  @relation(fields: [listingId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  phrasePreview String
+  isWinner      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([listingId, createdAt])
+}
+
+model Reservation {
+  id                String    @id @default(cuid())
+  listingId         String    @unique
+  listing           Listing   @relation(fields: [listingId], references: [id])
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  lockedAt          DateTime  @default(now())
+  paymentDeadlineAt DateTime
+  releasedAt        DateTime?
+  bullJobId         String?
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  reservationId   String    @unique
+  status          String    @default("pending")
+  paidAt          DateTime?
+  idempotencyKey  String?   @unique
+  createdAt       DateTime  @default(now())
+}

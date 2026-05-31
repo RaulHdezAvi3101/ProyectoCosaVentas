@@ -1,87 +1,63 @@
-# ProyectoCosaVentas
+# mio (rebuild)
 
-Marketplace C2C de coleccionables.
+Marketplace C2C de coleccionables — México. Reconstrucción procedural desde cero con capas claras y sin deuda de iteraciones anteriores.
 
-- Especificación: [PRD.md](./PRD.md)
-- **Fase 1 (mock UI):** UI estática — ver rutas en `web/src/mock/data.ts`
-- **Fase 2 (real-time):** Socket.io + First to Claim en memoria (`web/server.ts`)
-- **Fase 3 (local DB):** [web/PHASE3.md](./web/PHASE3.md) — PostgreSQL + Redis + auth local
+**Idioma UI:** español (México) · **Moneda:** MXN
+
+## Documentación
+
+Toda la guía de implementación vive en [`docs/README.md`](docs/README.md).
+
+| Documento | Propósito |
+|-----------|-----------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Capas, prohibiciones, `server.ts` |
+| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | slug=id, un rol `user`, rutas |
+| [docs/DATA-HANDOFF.md](docs/DATA-HANDOFF.md) | Modelo PostgreSQL, Redis, seed |
+| [docs/SECURITY.md](docs/SECURITY.md) | Sesión, FTC, redirects |
+| [docs/SOCKET-CONTRACT.md](docs/SOCKET-CONTRACT.md) | Eventos Socket.io |
+| [PRD.md](PRD.md) | Requerimientos de producto |
+
+## Fases de implementación
+
+Implementar **una fase a la vez**. No avanzar sin confirmación explícita tras cerrar el *gate* de cada fase.
+
+| Fase | Doc | Entrega |
+|------|-----|---------|
+| 0 | [docs/PHASE-0-SKELETON.md](docs/PHASE-0-SKELETON.md) | Monorepo, Docker, health, rutas placeholder |
+| 1 | [docs/PHASE-1-AUTH-PROFILES.md](docs/PHASE-1-AUTH-PROFILES.md) | Auth cookie + perfiles |
+| 2 | [docs/PHASE-2-LISTINGS-FEED.md](docs/PHASE-2-LISTINGS-FEED.md) | Listings + `/explore` |
+| 3 | [docs/PHASE-3-FIRST-TO-CLAIM.md](docs/PHASE-3-FIRST-TO-CLAIM.md) | Redis lock + WebSockets |
+| 4 | [docs/PHASE-4-CAMERA-PUBLISH.md](docs/PHASE-4-CAMERA-PUBLISH.md) | Cámara + R2 |
+| 5 | [docs/PHASE-5-PAYMENTS-TIMERS.md](docs/PHASE-5-PAYMENTS-TIMERS.md) | Checkout + timers |
+| 6 | [docs/PHASE-6-PRD-REMAINDER.md](docs/PHASE-6-PRD-REMAINDER.md) | DMs, reseñas, pasarela |
+
+## Stack (fijo)
+
+| Capa | Tecnología |
+|------|------------|
+| App | Next.js 14 App Router + TypeScript |
+| Servidor | `server.ts` (Next + Socket.io + BullMQ worker) |
+| BD | PostgreSQL 16 + Prisma 5 |
+| Cache / locks | Redis 7 + ioredis |
+| Jobs | BullMQ 5 |
+| Auth v1 | Sesión HTTP-only (sin Clerk) |
+| Real-time | Socket.io 4 |
+| Estilos | Tailwind 3 (componentes propios, sin shadcn v1) |
+| Imágenes | Cloudflare R2 |
+
+## Comandos previstos (tras Fase 0 código)
 
 ```bash
-# Desde la raíz del repo (recomendado)
-npm run install:web
-npm run dev
-
-# O directamente en la app
-cd web && npm ci && npm run dev
-```
-
-`npm ci` solo funciona donde existe `package-lock.json` — en este proyecto, dentro de `web/`, no en la raíz.
-
-### Fase 3 — Entrega 1 (PostgreSQL + feed)
-
-```bash
-# Desde la raíz del repo
 docker compose up -d
-cd web && cp .env.example .env
-npm run db:setup              # raíz: levanta Docker + migrate + seed
-npm run dev                   # raíz, o cd web && npm run dev
+cp .env.example .env
+npm install
+npm run db:migrate
+npm run db:seed    # o npm run db:restore
+npm run dev
 ```
 
-Scripts en `web/package.json`:
+Ver [docs/ENV.md](docs/ENV.md) y [docs/DATA-AND-SEED.md](docs/DATA-AND-SEED.md).
 
-| Script | Descripción |
-|--------|-------------|
-| `db:up` | `docker compose up -d` (Postgres + Redis) |
-| `db:down` | Para contenedores |
-| `db:migrate` | `prisma migrate dev` (desarrollo) |
-| `db:seed` | Usuarios y listings desde el mock |
-| `db:studio` | Prisma Studio |
-| `db:setup` | up + migrate deploy + seed |
+## Estado actual
 
-**Verificación Entrega 1:** tras `db:setup`, el feed en `/` muestra Charizard desde PostgreSQL (sin `DATA_SOURCE=mock`). Usuarios seed: `maria@local.dev` / `comprador@local.dev` → contraseña `demo1234`.
-
-**Perfiles demo de reputación:**
-
-| Perfil | URL | Login (vendedor) | Tier |
-|--------|-----|------------------|------|
-| Sofía — vendedor nuevo | `/profile/seller-3` | `sofia@local.dev` | `nuevo` (0 ventas) |
-| Raúl — reputación baja | `/profile/seller-4` | `raul@local.dev` | `low` (score 142) |
-
-Listings: `listing-sofia-nuevo`, `listing-raul-baja-rep` en el feed.
-
-### Fase 3 — Entrega 2 (Redis lock + ClaimStore)
-
-Requiere Entrega 1 (`db:setup`). Con Postgres + Redis activos y `USE_MEMORY_STORE=false`, First-to-Claim usa lock `SET NX` en Redis y persiste en PG.
-
-**Verificación:** gana en `/listings/live-charizard/claim` → reinicia `npm run dev` → el listing sigue `locked` (PG + reconciliación Redis al arranque). Dos pestañas: solo un ganador.
-
-### Fase 3 — Entrega 3 (auth local + sesiones en BD)
-
-- Login: `/auth/login` — `maria@local.dev` / `demo1234` (vendedor)
-- Registro: `/auth/register` — crea `User` y sesión en tabla `Session` (token opaco en cookie `cosaventas_session`)
-- Logout: `POST /api/auth/logout` revoca la sesión actual; `POST /api/auth/logout-all` revoca todas las del usuario
-- Rutas protegidas: `/sell/*`, `/seller/inbox` (middleware + cookie)
-- Inbox usa la sesión del vendedor (ya no `?sellerId=`)
-- Socket.io valida la cookie en el handshake; `claim:attempt` usa `userId` del servidor, no del cliente
-- Claims con sesión; invitados solo si `ALLOW_GUEST_CLAIM=true` (poner `false` en producción / beta cerrada)
-- Login y registro envían `legacyGuestId` desde `localStorage` para vincular intentos guest previos
-- Perfil propio: bloque «Mi cuenta» con cerrar sesión
-- Pago: `POST /api/orders/[slug]/pay` requiere sesión y que el usuario sea el ganador de la reserva
-- Publicar: `/sell/preview` → POST `/api/listings`
-
-**Variables:** `SESSION_SECRET` (≥32 caracteres), `ALLOW_GUEST_CLAIM` (`true` dev, `false` prod).
-
-**Verificación:** login como María → inbox solo sus FTC; dos cuentas distintas para probar un solo ganador. Tras `db:migrate`, tabla `Session` en PostgreSQL.
-
-### Fase 3 — Entrega 4 (BullMQ timer de pago)
-
-- Cola `payment-expired` al ganar un FTC
-- Worker en `server.ts` (mismo proceso)
-- Sin pago: listing → `live`, Redis winner borrado, WS `listing:released`
-- `POST /api/orders/[slug]/pay` cancela el job y marca `order.paid`
-- UI: overlay «Liberado» + banner en inbox
-
-**Prueba rápida:** en `web/.env` pon `PAYMENT_WINDOW_MS=60000` (1 min), reinicia `npm run dev`, gana un claim y espera — el listing vuelve a LIVE.
-
-Detalle completo: [web/PHASE3.md](./web/PHASE3.md).
+Solo documentación. El código de aplicación se implementa fase por fase según los docs anteriores.

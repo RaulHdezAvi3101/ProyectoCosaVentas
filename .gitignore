@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.next/
+out/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Build / cache
+*.tsbuildinfo
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Prisma dumps (opcional: descomentar si no versionas SQL)
+# prisma/dumps/*.sql
+# !prisma/dumps/README.md
+
+# Uploads locales
+public/uploads/

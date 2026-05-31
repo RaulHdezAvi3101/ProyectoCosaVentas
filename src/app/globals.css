@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+
+  --color-surface: #f0eff4;
+  --color-ink: #111111;
+  --color-brand: #33658a;
+  --color-accent: #ff9a3d;
+  --color-card: #ffffff;
+  --color-destructive: #dc2626;
+}
+
+@layer base {
+  body {
+    @apply min-h-screen bg-surface font-sans text-ink antialiased;
+  }
+
+  a {
+    @apply text-brand no-underline transition-colors hover:text-brand/80;
+  }
+}

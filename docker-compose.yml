@@ -1,27 +1,31 @@
-# Fase 3 — servicios locales (ver web/PHASE3.md)
+# mio — infra local (Fase 0+)
+# Uso: docker compose up -d
+
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: mio-postgres
     environment:
-      POSTGRES_USER: cosaventas
-      POSTGRES_PASSWORD: cosaventas
-      POSTGRES_DB: cosaventas
+      POSTGRES_USER: mio
+      POSTGRES_PASSWORD: mio
+      POSTGRES_DB: mio
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mio_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cosaventas"]
+      test: ["CMD-SHELL", "pg_isready -U mio -d mio"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    container_name: mio-redis
     ports:
       - "6379:6379"
     volumes:
-      - redisdata:/data
+      - mio_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -29,5 +33,5 @@ services:
       retries: 5
 
 volumes:
-  pgdata:
-  redisdata:
+  mio_pg_data:
+  mio_redis_data:

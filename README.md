@@ -6,20 +6,7 @@ Marketplace C2C de coleccionables — México. Reconstrucción procedural desde 
 
 ## Documentación
 
-Toda la guía de implementación vive en [`docs/README.md`](docs/README.md).
-
-| Documento | Propósito |
-|-----------|-----------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Capas, prohibiciones, `server.ts` |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | slug=id, un rol `user`, rutas |
-| [docs/DATA-HANDOFF.md](docs/DATA-HANDOFF.md) | Modelo PostgreSQL, Redis, seed |
-| [docs/SECURITY.md](docs/SECURITY.md) | Sesión, FTC, redirects |
-| [docs/SOCKET-CONTRACT.md](docs/SOCKET-CONTRACT.md) | Eventos Socket.io |
-| [PRD.md](PRD.md) | Requerimientos de producto |
-
-## Fases de implementación
-
-Implementar **una fase a la vez**. No avanzar sin confirmación explícita tras cerrar el *gate* de cada fase.
+### Fases de implementación
 
 | Fase | Doc | Entrega |
 |------|-----|---------|
@@ -31,7 +18,7 @@ Implementar **una fase a la vez**. No avanzar sin confirmación explícita tras 
 | 5 | [docs/PHASE-5-PAYMENTS-TIMERS.md](docs/PHASE-5-PAYMENTS-TIMERS.md) | Checkout + timers |
 | 6 | [docs/PHASE-6-PRD-REMAINDER.md](docs/PHASE-6-PRD-REMAINDER.md) | DMs, reseñas, pasarela |
 
-## Stack (fijo)
+### Stack (fijo)
 
 | Capa | Tecnología |
 |------|------------|
@@ -45,19 +32,3 @@ Implementar **una fase a la vez**. No avanzar sin confirmación explícita tras 
 | Estilos | Tailwind 3 (componentes propios, sin shadcn v1) |
 | Imágenes | Cloudflare R2 |
 
-## Comandos previstos (tras Fase 0 código)
-
-```bash
-docker compose up -d
-cp .env.example .env
-npm install
-npm run db:migrate
-npm run db:seed    # o npm run db:restore
-npm run dev
-```
-
-Ver [docs/ENV.md](docs/ENV.md) y [docs/DATA-AND-SEED.md](docs/DATA-AND-SEED.md).
-
-## Estado actual
-
-Solo documentación. El código de aplicación se implementa fase por fase según los docs anteriores.
